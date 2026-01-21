@@ -36,10 +36,21 @@ def format_date(d):
 def style_status(row):
     h = datetime.now().date()
     n = row[COL_NAECHSTER]
-    if pd.isna(n): return [''] * len(row)
-    if n < h: return ['background-color: #ffcccc'] * len(row)
-    elif n < h + timedelta(days=30): return ['background-color: #fff3cd'] * len(row)
-    else: return ['background-color: #d4edda'] * len(row)
+    # Standard: Keine Farbe
+    if pd.isna(n): 
+        return [''] * len(row)
+    
+    # Kritisch (Rot) - Schrift schwarz für bessere Lesbarkeit
+    if n < h: 
+        return ['background-color: #ffcccc; color: black; font-weight: bold'] * len(row)
+    
+    # Bald fällig (Gelb) - Schrift schwarz
+    elif n < h + timedelta(days=30): 
+        return ['background-color: #fff3cd; color: black; font-weight: bold'] * len(row)
+    
+    # Alles OK (Grün) - Schrift schwarz
+    else: 
+        return ['background-color: #d4edda; color: black'] * len(row)
 
 # --- DASHBOARD ---
 heute = datetime.now().date()
