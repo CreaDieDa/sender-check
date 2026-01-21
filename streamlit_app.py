@@ -15,7 +15,6 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read()
 
 # --- EXAKTE SPALTEN-DEFINITIONEN ---
-# Diese müssen 1:1 so in der ersten Zeile deiner Google Tabelle stehen!
 COL_NAME = "Sender Name"
 COL_ORT = "Standort"
 COL_LETZTER = "Letzter Batteriewechsel"
@@ -23,11 +22,11 @@ COL_NAECHSTER = "Nächster Wechsel (geplant)"
 COL_VERMERK = "Vermerke (z.B. Batterie)"
 COL_STATUS = "Status"
 
-# Struktur prüfen/erstellen
+# Grundstruktur sicherstellen
 if df.empty or COL_NAME not in df.columns:
     df = pd.DataFrame(columns=[COL_NAME, COL_ORT, COL_LETZTER, COL_NAECHSTER, COL_VERMERK, COL_STATUS])
 
-# Datumsformate für Berechnungen vorbereiten
+# Datumsformate bereinigen (verhindert Abstürze bei leeren Feldern)
 df[COL_LETZTER] = pd.to_datetime(df[COL_LETZTER], errors='coerce').dt.date
 df[COL_NAECHSTER] = pd.to_datetime(df[COL_NAECHSTER], errors='coerce').dt.date
 
@@ -35,10 +34,10 @@ df[COL_NAECHSTER] = pd.to_datetime(df[COL_NAECHSTER], errors='coerce').dt.date
 def style_status(row):
     heute = datetime.now().date()
     naechster = row[COL_NAECHSTER]
-    if pd.isna(naechster): return [''] * len(row)
-    if naechster < heute: return ['background-color: #ffcccc'] * len(row)
-    elif naechster < heute + timedelta(days=30): return ['background-color: #fff3cd'] * len(row)
-    else: return ['background-color: #d4edda'] * len(row)
+    if pd.isna(naechster) or not hasattr(naechster, 'year'): return [''] * len(row)
+    if naechster < heute: return ['background-color: #ffcccc'] * len(row) # Rot
+    elif naechster < heute + timedelta(days=30): return ['background-color: #fff3cd'] * len(row) # Gelb
+    else: return ['background-color: #d4edda'] * len(row) # Grün
 
 # --- EINGABEFORMULAR ---
 with st.expander("➕ Neuen Batteriewechsel registrieren", expanded=True):
@@ -51,18 +50,19 @@ with st.expander("➕ Neuen Batteriewechsel registrieren", expanded=True):
         # Automatischer Standort-Finder
         bekannter_standort = ""
         if name_input and not df.empty:
-            treffer = df[df[COL_NAME] == name_input]
+            valid_names = df.dropna(subset=[COL_NAME])
+            treffer = valid_names[valid_names[COL_NAME].astype(str) == name_input]
             if not treffer.empty:
                 bekannter_standort = str(treffer.iloc[-1][COL_ORT])
         
         standort_input = st.text_input("Standort", value=bekannter_standort)
-        vermerk_input = st.text_input("Vermerke (z.B. CR2032 Batterie)")
+        vermerk_input = st.text_input("Vermerke (z.B. Batteriebezeichnung)")
         
         submit = st.form_submit_button("Wechsel speichern")
 
         if submit:
             if name_input != "":
-                naechster_avis = wechsel_datum + timedelta(days=547)
+                naechster_avis = wechsel_datum + timedelta(days=547) # 18 Monate
                 
                 new_row = pd.DataFrame([{
                     COL_NAME: name_input, 
@@ -78,17 +78,19 @@ with st.expander("➕ Neuen Batteriewechsel registrieren", expanded=True):
                 st.success(f"Eintrag für {name_input} gespeichert!")
                 st.rerun()
             else:
-                st.error("Bitte einen Namen eingeben!")
+                st.error("Bitte einen Sendernamen eingeben!")
 
 # --- ANZEIGE ---
 def format_date(d):
     return d.strftime('%d.%m.%Y') if pd.notnull(d) and hasattr(d, 'strftime') else ""
 
-df_display = df.dropna(subset=[COL_NAME]).copy()
+# Nur Zeilen mit echtem Namen filtern (entfernt die "None" Zeilen aus deinem Bild)
+df_clean = df.dropna(subset=[COL_NAME]).copy()
+df_clean = df_clean[df_clean[COL_NAME].astype(str).str.strip() != ""]
 
-if not df_display.empty:
+if not df_clean.empty:
     st.subheader("📡 Aktueller Batteriestatus")
-    df_aktuell = df_display.sort_values(by=COL_LETZTER, ascending=False).drop_duplicates(subset=[COL_NAME])
+    df_aktuell = df_clean.sort_values(by=COL_LETZTER, ascending=False).drop_duplicates(subset=[COL_NAME])
     df_aktuell = df_aktuell.sort_values(by=COL_NAECHSTER, ascending=True)
     
     st.dataframe(
@@ -98,17 +100,18 @@ if not df_display.empty:
     
     st.markdown("---")
     st.subheader("🕒 Historie & Verlauf")
-    namen_liste = sorted(df_display[COL_NAME].astype(str).unique())
+    
+    namen_liste = sorted(df_clean[COL_NAME].astype(str).unique())
     auswahl = st.selectbox("Sender auswählen:", ["Alle anzeigen"] + namen_liste)
     
-    if auswahl == "Alle anzeigen":
-        df_hist = df_display.sort_values(by=COL_LETZTER, ascending=False)
-    else:
-        df_hist = df_display[df_display[COL_NAME] == auswahl].sort_values(by=COL_LETZTER, ascending=False)
+    df_hist = df_clean if auswahl == "Alle anzeigen" else df_clean[df_clean[COL_NAME].astype(str) == auswahl]
+    df_hist = df_hist.sort_values(by=COL_LETZTER, ascending=False)
     
-    df_hist_view = df_hist.copy()
-    df_hist_view[COL_LETZTER] = df_hist_view[COL_LETZTER].apply(format_date)
-    df_hist_view[COL_NAECHSTER] = df_hist_view[COL_NAECHSTER].apply(format_date)
-    st.table(df_hist_view[[COL_NAME, COL_ORT, COL_LETZTER, COL_NAECHSTER, COL_VERMERK]])
+    # Anzeigeformatierung
+    df_view = df_hist.copy()
+    df_view[COL_LETZTER] = df_view[COL_LETZTER].apply(format_date)
+    df_view[COL_NAECHSTER] = df_view[COL_NAECHSTER].apply(format_date)
+    
+    st.table(df_view[[COL_NAME, COL_ORT, COL_LETZTER, COL_NAECHSTER, COL_VERMERK]])
 else:
     st.info("Noch keine Daten vorhanden.")
