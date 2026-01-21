@@ -17,7 +17,7 @@ df = conn.read()
 
 # Hilfsfunktion: Datumsspalten umwandeln, falls sie als Text kommen
 df['Letzter Batteriewechsel'] = pd.to_datetime(df['Letzter Batteriewechsel']).dt.date
-df['Nächster Wechsel'] = pd.to_datetime(df['Nächster Wechsel']).dt.date
+df['Nächster Wechsel'] = pd.to_datetime(df['Nächster Wechsel (geplant)']).dt.date
 
 # --- FUNKTION: FARBLOGIK (Ampelsystem) ---
 def style_status(row):
