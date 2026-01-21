@@ -1,52 +1,86 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
+from datetime import datetime, timedelta
 
 # Seite konfigurieren
-st.set_page_config(page_title="Sender-Wartung", page_icon="🔋")
+st.set_page_config(page_title="Sender-Batterie-Check", page_icon="🔋")
 
 st.title("🔋 Sender-Batterie-Check")
+st.markdown("Verwalte und überwache die Batteriewechsel deiner ABUS-Sender.")
 
-# 1. Verbindung aufbauen
+# 1. Verbindung zur Google Tabelle herstellen
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 2. Daten lesen
+# 2. Daten einlesen
 df = conn.read()
 
-# 3. Eingabeformular
-with st.form("entry_form"):
-    st.write("Neuen Batteriewechsel registrieren:")
-    sender = st.text_input("Name des Senders")
-    ort = st.text_input("Standort")
-    datum = st.date_input("Wechseldatum")
-    notiz = st.text_input("Bemerkung (z.B. Batterietyp)")
-    
-    submit = st.form_submit_button("In Tabelle speichern")
+# Hilfsfunktion: Datumsspalten umwandeln, falls sie als Text kommen
+df['Letzter Batteriewechsel'] = pd.to_datetime(df['Letzter Batteriewechsel']).dt.date
+df['Nächster Wechsel'] = pd.to_datetime(df['Nächster Wechsel']).dt.date
 
-    if submit:
-        if sender and ort:
-            # Neue Zeile vorbereiten
-            new_row = pd.DataFrame([{
-                "Sender Name": sender,
-                "Standort": ort,
-                "Letzter Batteriewechsel": str(datum),
-                "Nächster Wechsel (geplant)": notiz
+# --- FUNKTION: FARBLOGIK (Ampelsystem) ---
+def style_status(row):
+    heute = datetime.now().date()
+    naechster = row['Nächster Wechsel']
+    
+    # Rot: Überfällig
+    if naechster < heute:
+        return ['background-color: #ffcccc'] * len(row)
+    # Gelb: Fällig in den nächsten 30 Tagen
+    elif naechster < heute + timedelta(days=30):
+        return ['background-color: #fff3cd'] * len(row)
+    # Grün: Alles okay
+    else:
+        return ['background-color: #d4edda'] * len(row)
+
+# --- EINGABEFORMULAR ---
+st.subheader("Neuen Wechsel registrieren")
+with st.form("entry_form"):
+    name = st.text_input("Name des Senders (z.B. Sender 01)")
+    standort = st.text_input("Standort (z.B. Kellerfenster)")
+    
+    submit_button = st.form_submit_button("Wechsel jetzt speichern")
+
+    if submit_button:
+        if name and standort:
+            # Automatische Berechnung
+            heute = datetime.now().date()
+            # 18 Monate = ca. 547 Tage
+            naechster_termin = heute + timedelta(days=547)
+            
+            # Neue Datenzeile erstellen
+            new_data = pd.DataFrame([{
+                "Name": name,
+                "Standort": standort,
+                "Letzter Batteriewechsel": heute,
+                "Nächster Wechsel": naechster_termin,
+                "Status": "OK"
             }])
             
-            # Daten zusammenführen
-            updated_df = pd.concat([df, new_row], ignore_index=True)
+            # Daten an bestehende Tabelle anhängen
+            updated_df = pd.concat([df, new_data], ignore_index=True)
             
-            # Speichern versuchen
-            try:
-                conn.update(data=updated_df)
-                st.success(f"✅ Gespeichert: {sender} am {datum}")
-                st.balloons()
-            except Exception as e:
-                st.error("⚠️ Fehler beim Schreiben in Google Sheets.")
-                st.info("Bitte prüfe, ob die Tabelle für 'Jeden mit Link' als 'Mitbearbeiter' freigegeben ist.")
+            # In Google Sheets speichern
+            conn.update(data=updated_df)
+            st.success(f"Erfolgreich gespeichert! Nächster Wechsel am {naechster_termin.strftime('%d.%m.%Y')}")
+            st.balloons()
+            # Seite neu laden, um Tabelle zu aktualisieren
+            st.rerun()
         else:
-            st.warning("Bitte fülle mindestens 'Name' und 'Standort' aus.")
+            st.warning("Bitte fülle Name und Standort aus.")
 
-# 4. Tabelle anzeigen
-st.subheader("Aktuelle Wartungsliste")
-st.dataframe(df)
+# --- ANZEIGE DER LISTE ---
+st.subheader("Status-Übersicht")
+
+# Sortierung: Die kritischen (frühesten Termine) zuerst
+df_sorted = df.sort_values(by="Nächster Wechsel", ascending=True)
+
+# Tabelle mit Farben anzeigen
+st.dataframe(
+    df_sorted.style.apply(style_status, axis=1),
+    use_container_width=True,
+    hide_index=True
+)
+
+st.info("💡 Rot = Überfällig | Gelb = Bald fällig (< 30 Tage) | Grün = OK")
