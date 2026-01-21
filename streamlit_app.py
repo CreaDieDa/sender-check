@@ -7,80 +7,78 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="Sender-Batterie-Check", page_icon="🔋")
 
 st.title("🔋 Sender-Batterie-Check")
-st.markdown("Verwalte und überwache die Batteriewechsel deiner ABUS-Sender.")
 
-# 1. Verbindung zur Google Tabelle herstellen
+# 1. Verbindung zur Google Tabelle
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 2. Daten einlesen
+# 2. Daten einlesen & Spaltennamen fixieren
 df = conn.read()
 
-# Hilfsfunktion: Datumsspalten umwandeln, falls sie als Text kommen
-df['Letzter Batteriewechsel'] = pd.to_datetime(df['Letzter Batteriewechsel']).dt.date
-df['Nächster Wechsel'] = pd.to_datetime(df['Nächster Wechsel (geplant)']).dt.date
+# Falls die Tabelle komplett leer ist, Grundstruktur erstellen
+if df.empty or 'Nächster Wechsel' not in df.columns:
+    df = pd.DataFrame(columns=["Name", "Standort", "Letzter Batteriewechsel", "Nächster Wechsel", "Status"])
 
-# --- FUNKTION: FARBLOGIK (Ampelsystem) ---
+# Datumsformate bereinigen (verhindert den TypeError)
+df['Letzter Batteriewechsel'] = pd.to_datetime(df['Letzter Batteriewechsel'], errors='coerce').dt.date
+df['Nächster Wechsel'] = pd.to_datetime(df['Nächster Wechsel'], errors='coerce').dt.date
+
+# --- FUNKTION: FARBLOGIK ---
 def style_status(row):
     heute = datetime.now().date()
     naechster = row['Nächster Wechsel']
     
-    # Rot: Überfällig
-    if naechster < heute:
-        return ['background-color: #ffcccc'] * len(row)
-    # Gelb: Fällig in den nächsten 30 Tagen
-    elif naechster < heute + timedelta(days=30):
-        return ['background-color: #fff3cd'] * len(row)
-    # Grün: Alles okay
-    else:
-        return ['background-color: #d4edda'] * len(row)
-
-# --- EINGABEFORMULAR ---
-st.subheader("Neuen Wechsel registrieren")
-with st.form("entry_form"):
-    name = st.text_input("Name des Senders (z.B. Sender 01)")
-    standort = st.text_input("Standort (z.B. Kellerfenster)")
+    # Schutz vor leeren Datumsfeldern
+    if pd.isna(naechster):
+        return [''] * len(row)
     
-    submit_button = st.form_submit_button("Wechsel jetzt speichern")
+    if naechster < heute:
+        return ['background-color: #ffcccc'] * len(row) # Rot
+    elif naechster < heute + timedelta(days=30):
+        return ['background-color: #fff3cd'] * len(row) # Gelb
+    else:
+        return ['background-color: #d4edda'] * len(row) # Grün
 
-    if submit_button:
-        if name and standort:
-            # Automatische Berechnung
+# --- EINGABE ---
+with st.expander("➕ Neuen Wechsel registrieren", expanded=True):
+    with st.form("entry_form", clear_on_submit=True):
+        col1, col2 = st.columns(2)
+        name = col1.text_input("Name des Senders")
+        standort = col2.text_input("Standort")
+        submit = st.form_submit_button("Speichern (Avis: 18 Monate)")
+
+        if submit and name and standort:
             heute = datetime.now().date()
-            # 18 Monate = ca. 547 Tage
-            naechster_termin = heute + timedelta(days=547)
+            naechster = heute + timedelta(days=547) # 18 Monate
             
-            # Neue Datenzeile erstellen
-            new_data = pd.DataFrame([{
-                "Name": name,
-                "Standort": standort,
-                "Letzter Batteriewechsel": heute,
-                "Nächster Wechsel": naechster_termin,
-                "Status": "OK"
+            new_row = pd.DataFrame([{
+                "Name": name, "Standort": standort, 
+                "Letzter Batteriewechsel": heute, 
+                "Nächster Wechsel": naechster, "Status": "OK"
             }])
             
-            # Daten an bestehende Tabelle anhängen
-            updated_df = pd.concat([df, new_data], ignore_index=True)
-            
-            # In Google Sheets speichern
-            conn.update(data=updated_df)
-            st.success(f"Erfolgreich gespeichert! Nächster Wechsel am {naechster_termin.strftime('%d.%m.%Y')}")
-            st.balloons()
-            # Seite neu laden, um Tabelle zu aktualisieren
+            df = pd.concat([df, new_row], ignore_index=True)
+            conn.update(data=df)
+            st.success("Gespeichert!")
             st.rerun()
-        else:
-            st.warning("Bitte fülle Name und Standort aus.")
 
-# --- ANZEIGE DER LISTE ---
-st.subheader("Status-Übersicht")
+# --- TABELLE ANZEIGEN ---
+st.subheader("Übersicht")
+if not df.empty:
+    # Sortieren (Kritische oben), leere Daten nach unten
+    df_display = df.sort_values(by="Nächster Wechsel", ascending=True, na_position='last')
+    
+    st.dataframe(
+        df_display.style.apply(style_status, axis=1),
+        use_container_width=True,
+        hide_index=True
+    )
+else:
+    st.write("Noch keine Daten vorhanden. Nutze das Formular oben!")
 
-# Sortierung: Die kritischen (frühesten Termine) zuerst
-df_sorted = df.sort_values(by="Nächster Wechsel", ascending=True)
-
-# Tabelle mit Farben anzeigen
-st.dataframe(
-    df_sorted.style.apply(style_status, axis=1),
-    use_container_width=True,
-    hide_index=True
-)
-
-st.info("💡 Rot = Überfällig | Gelb = Bald fällig (< 30 Tage) | Grün = OK")
+# --- ADMIN BEREICH ---
+with st.expander("⚙️ Einstellungen"):
+    if st.button("Tabelle komplett leeren (Reset)"):
+        empty_df = pd.DataFrame(columns=["Name", "Standort", "Letzter Batteriewechsel", "Nächster Wechsel", "Status"])
+        conn.update(data=empty_df)
+        st.warning("Alle Daten wurden gelöscht.")
+        st.rerun()
