@@ -11,7 +11,7 @@ st.title("🔋 ABUS Batteriecheck")
 
 # --- VERBINDUNG & DATEN ---
 conn = st.connection("gsheets", type=GSheetsConnection)
-df = conn.read(ttl=0) 
+df = conn.read(spreadsheet=st.secrets["spreadsheet"], ttl=0)
 
 COL_NAME = "Sender Name"
 COL_ORT = "Standort"
