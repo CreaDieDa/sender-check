@@ -56,13 +56,16 @@ with st.expander("➕ Neuen Batteriewechsel registrieren", expanded=True):
         # Kalender Auswahl
         wechsel_datum = col2.date_input("Datum des Wechsels", datetime.now().date(), format="DD.MM.YYYY")
         
-        # Standort automatisch finden
+            # Standort automatisch finden (mit nan-Schutz)
         bekannter_standort = ""
         if name_input and not df.empty:
-            valid_names = df.dropna(subset=[COL_NAME])
-            treffer = valid_names[valid_names[COL_NAME].astype(str) == name_input]
+            valid_rows = df.dropna(subset=[COL_NAME, COL_ORT]) # Nur Zeilen mit Name UND Ort prüfen
+            treffer = valid_rows[valid_rows[COL_NAME].astype(str) == name_input]
             if not treffer.empty:
-                bekannter_standort = str(treffer.iloc[-1][COL_ORT])
+                letzter_ort = treffer.iloc[-1][COL_ORT]
+                # Sicherstellen, dass es kein "nan" oder "None" ist
+                if pd.notnull(letzter_ort) and str(letzter_ort).lower() != "nan":
+                    bekannter_standort = str(letzter_ort)
         
         standort_input = st.text_input("Standort", value=bekannter_standort)
         vermerk_input = st.text_input("Vermerke (z.B. CR2032)")
