@@ -40,9 +40,15 @@ try:
     COL_NAECHSTER = "Nächster Wechsel (geplant)"
     COL_VERMERK = "Vermerke (z.B. Batterie)"
 
-    if COL_NAME not in df.columns:
+   if COL_NAME not in df.columns:
         st.error("Konnte Spalte 'Sender Name' nicht finden. Prüfe die Google Tabelle!")
     else:
+        # DATUMS-LOGIK
+        # Wir wandeln die Spalten in echte Daten um, damit wir rechnen können
+        df[COL_LETZTER] = pd.to_datetime(df[COL_LETZTER], errors='coerce').dt.date
+        df[COL_NAECHSTER] = pd.to_datetime(df[COL_NAECHSTER], errors='coerce').dt.date
+        
+        heute = datetime.now().date()
 
 # Grundstruktur sicherstellen
 if df is None or df.empty or COL_NAME not in df.columns:
