@@ -146,4 +146,8 @@ try:
             df_hist = df_hist[df_hist[COL_NAME] == f_sender]
         
         df_hist[COL_LETZTER] = df_hist[COL_LETZTER].apply(format_date)
-        df_hist[COL_NAECHSTER] = df_hist[COL_NAECH
+        df_hist[COL_NAECHSTER] = df_hist[COL_NAECHSTER].apply(format_date)
+        st.table(df_hist[[COL_NAME, COL_ORT, COL_LETZTER, COL_NAECHSTER, COL_VERMERK]])
+
+except Exception as e:
+    st.error(f"Fehler: {e}")
