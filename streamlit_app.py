@@ -21,7 +21,11 @@ st.markdown("""
 st.title("🔋 ABUS Batteriecheck")
 
 # --- VERBINDUNG & DATEN (Mit Turbo-Caching) ---
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Wir fügen eine Fehlerbehandlung direkt beim Verbindungsaufbau hinzu
+try:
+    conn = st.connection("gsheets", type=GSheetsConnection)
+except Exception:
+    st.warning("Verbindung wird aufgebaut... Bitte kurz warten.")
 
 @st.cache_data(ttl=600) # Speichert Daten für 10 Minuten für schnelles Laden am Handy
 def load_data():
