@@ -133,10 +133,6 @@ try:
     alle_standorte = sorted([s for s in df_aktuell[COL_ORT].unique() if s != ""])
     filter_ort = st.selectbox("Nach Standort filtern:", ["Alle Standorte"] + alle_standorte)
     
-    df_display = df_view_final.copy()
-    if filter_ort != "Alle Standorte":
-        df_display = df_display[df_display[COL_ORT] == filter_ort]
-
     st.dataframe(
         df_display.style.apply(style_status, axis=1, heute=heute).format({COL_LETZTER: format_date, COL_NAECHSTER: format_date}),
         use_container_width=True, 
