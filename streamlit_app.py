@@ -30,16 +30,16 @@ def load_data():
 try:
     df = load_data_simple()
     
-    # --- NEU: LEERE FELDER (None/NaN) DURCH LEERZEICHEN ERSETZEN ---
+    # 1. Leere Zellen ("None") sofort entfernen
     df = df.fillna("") 
-    # --------------------------------------------------------------
 
-COL_NAME = "Sender Name"
-COL_ORT = "Standort"
-COL_LETZTER = "Letzter Batteriewechsel"
-COL_NAECHSTER = "Nächster Wechsel (geplant)"
-COL_VERMERK = "Vermerke (z.B. Batterie)"
-COL_STATUS = "Status"
+    # 2. Spaltennamen festlegen
+    COL_NAME = "Sender Name"
+    COL_ORT = "Standort"
+    COL_LETZTER = "Letzter Batteriewechsel"
+    COL_NAECHSTER = "Nächster Wechsel (geplant)"
+    COL_VERMERK = "Vermerke (z.B. Batterie)"
+    COL_STATUS = "Status"
 
 # Grundstruktur sicherstellen
 if df is None or df.empty or COL_NAME not in df.columns:
