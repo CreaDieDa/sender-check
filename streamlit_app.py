@@ -41,6 +41,10 @@ try:
     COL_VERMERK = "Vermerke (z.B. Batterie)"
     COL_STATUS = "Status"
 
+except Exception as e:
+    st.error(f"Fehler beim Laden: {e}")
+    st.stop()
+
 # Grundstruktur sicherstellen
 if df is None or df.empty or COL_NAME not in df.columns:
     df = pd.DataFrame(columns=[COL_NAME, COL_ORT, COL_LETZTER, COL_NAECHSTER, COL_VERMERK, COL_STATUS])
