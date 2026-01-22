@@ -44,31 +44,39 @@ def style_status(row, heute):
 try:
     # 1. Daten laden
     df_raw = load_data()
-    
-    # 2. "None" entfernen (Killer-Zeile)
-    df = df_raw.fillna("").astype(str).replace(["None", "nan", "NaN", "<NA>"], "")
+    df = df_raw.copy()
 
-    # Spaltennamen
+    # Spaltennamen definieren
     COL_NAME = "Sender Name"
     COL_ORT = "Standort"
     COL_LETZTER = "Letzter Batteriewechsel"
     COL_NAECHSTER = "Nächster Wechsel (geplant)"
     COL_VERMERK = "Vermerke (z.B. Batterie)"
 
-    # Datumstypen für Berechnungen konvertieren
+    # 2. DATUMS-KONVERTIERUNG (Zuerst in echte Daten wandeln)
     df[COL_LETZTER] = pd.to_datetime(df[COL_LETZTER], errors='coerce').dt.date
     df[COL_NAECHSTER] = pd.to_datetime(df[COL_NAECHSTER], errors='coerce').dt.date
     
+    # 3. AUTOMATISCHE ERGÄNZUNG (Berechnung der 547 Tage)
+    # Nur wenn 'Letzter Wechsel' da ist, aber 'Nächster Wechsel' fehlt
+    maske = (df[COL_LETZTER].notnull()) & (df[COL_NAECHSTER].isnull())
+    df.loc[maske, COL_NAECHSTER] = df.loc[maske, COL_LETZTER] + timedelta(days=547)
+
+    # 4. JETZT ERST DEN "NONE-KILLER" ANWENDEN (für die Anzeige)
+    # Aber wir behalten die Datumsspalten als echte Daten für die Sortierung!
+    df[COL_ORT] = df[COL_ORT].fillna("")
+    df[COL_VERMERK] = df[COL_VERMERK].fillna("")
+    
     heute = datetime.now().date()
 
-    # NUR DIE AKTUELLSTEN EINTRÄGE FÜR DAS DASHBOARD & STATUS
-    df_clean = df[df[COL_NAME] != ""].copy()
+    # 5. FILTERUNG: Nur der aktuellste Eintrag pro Sender
+    df_clean = df[df[COL_NAME].notnull() & (df[COL_NAME] != "")].copy()
     
-    # Hier filtern wir die "alten erledigten" raus: Nur der neueste Eintrag pro Sender bleibt
-    df_aktuell = df_clean.sort_values(by=[COL_NAME, COL_LETZTER], ascending=[True, False]).drop_duplicates(subset=[COL_NAME])
+    # Wir sortieren so, dass überfällige (kleinstes Datum) oben stehen
+    df_view_final = df_clean.sort_values(by=[COL_NAECHSTER, COL_NAME], ascending=[True, True])
     
-    # Für die Anzeige: Die kritischen (Rot) nach oben
-    df_view_final = df_aktuell.sort_values(by=[COL_NAECHSTER], ascending=True)
+    # Nur den aktuellsten Stand pro Sender behalten
+    df_view_final = df_view_final.drop_duplicates(subset=[COL_NAME], keep='first')
 
     # --- DASHBOARD ---
     kritisch = len(df_view_final[df_view_final[COL_NAECHSTER] < heute])
