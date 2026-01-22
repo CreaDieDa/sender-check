@@ -45,8 +45,6 @@ try:
     # 1. Daten laden
     df_raw = load_data()
     df = df_raw.copy()
-
-    # HEUTE ganz am Anfang definieren
     heute = datetime.now().date()
 
     # Spaltennamen definieren
@@ -61,40 +59,25 @@ try:
     df[COL_NAECHSTER] = pd.to_datetime(df[COL_NAECHSTER], errors='coerce').dt.date
     
     # 3. AUTOMATISCHE ERGÄNZUNG (+547 Tage)
-    # Füllt die leeren Felder aus deinem Screenshot
-    maske = (df[COL_LETZTER].notnull()) & (df[COL_NAECHSTER].isnull())
-    df.loc[maske, COL_NAECHSTER] = df.loc[maske, COL_LETZTER] + timedelta(days=547)
-
-    # 4. SÄUBERUNG & SORTIERUNG FÜR DIE AKTUELL-ANZEIGE
-    df_clean = df[df[COL_NAME].notnull() & (df[COL_NAME] != "")].copy()
-    
- # 3. AUTOMATISCHE ERGÄNZUNG (+547 Tage)
+    # Wichtig: Erst rechnen, wenn die Felder noch wirklich leer (null) sind
     maske = (df[COL_LETZTER].notnull()) & (df[COL_NAECHSTER].isnull())
     df.loc[maske, COL_NAECHSTER] = df.loc[maske, COL_LETZTER] + timedelta(days=547)
 
     # --- REINIGUNG DER TEXT-SPALTEN (Gegen das 'None') ---
-    # Wir füllen leere Textzellen mit einem leeren String, 
-    # lassen aber die Datumsspalten (COL_LETZTER, COL_NAECHSTER) unberührt!
-    text_spalten = [COL_ORT, COL_VERMERK, "Status"]
-    for col in text_spalten:
+    # Wir bereinigen nur die Textspalten. Datum bleibt Datum!
+    for col in [COL_ORT, COL_VERMERK, "Status"]:
         if col in df.columns:
             df[col] = df[col].fillna("").astype(str).replace(["None", "nan", "NaN", "<NA>"], "")
 
-    # 4. SÄUBERUNG & SORTIERUNG FÜR DIE AKTUELL-ANZEIGE
+    # 4. SÄUBERUNG & SORTIERUNG
     df_clean = df[df[COL_NAME].notnull() & (df[COL_NAME] != "")].copy()
     
-    # Neueste zuerst, dann Duplikate weg
+    # Neueste zuerst (für die Auswahl des aktuellen Stands)
     df_aktuell = df_clean.sort_values(by=[COL_NAME, COL_LETZTER], ascending=[True, False])
     df_aktuell = df_aktuell.drop_duplicates(subset=[COL_NAME], keep='first')
     
     # Finaler View: Rot (Überfällig) nach oben
-    df_view_final = df_aktuell.sort_values(by=[COL_NAECHSTER], ascending=True)rue)
-
-    # --- DASHBOARD BERECHNUNG ---
-    kritisch = len(df_view_final[df_view_final[COL_NAECHSTER] < heute])
-    bald = len(df_view_final[(df_view_final[COL_NAECHSTER] >= heute) & (df_view_final[COL_NAECHSTER] < heute + timedelta(days=30))])
-
-    # Ab hier die Anzeige (c1, c2, c3, st.dataframe, etc.)
+    df_view_final = df_aktuell.sort_values(by=[COL_NAECHSTER], ascending=True)
 
     # --- DASHBOARD ---
     kritisch = len(df_view_final[df_view_final[COL_NAECHSTER] < heute])
@@ -164,9 +147,4 @@ try:
         if f_sender != "Alle":
             df_hist = df_hist[df_hist[COL_NAME] == f_sender]
         
-        df_hist[COL_LETZTER] = df_hist[COL_LETZTER].apply(format_date)
-        df_hist[COL_NAECHSTER] = df_hist[COL_NAECHSTER].apply(format_date)
-        st.table(df_hist[[COL_NAME, COL_ORT, COL_LETZTER, COL_NAECHSTER, COL_VERMERK]])
-
-except Exception as e:
-    st.error(f"Fehler: {e}")
+        df_hist
