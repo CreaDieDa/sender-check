@@ -76,20 +76,28 @@ try:
     kritisch = len(df_view[df_view[COL_NAECHSTER] < heute])
     # ... Rest des Dashboards
     
-        # --- DASHBOARD ---
-        df_aktuell_check = df_clean.sort_values(by=COL_LETZTER, ascending=False).drop_duplicates(subset=[COL_NAME])
-        kritisch = len(df_aktuell_check[df_aktuell_check[COL_NAECHSTER] < heute])
-        bald = len(df_aktuell_check[(df_aktuell_check[COL_NAECHSTER] >= heute) & (df_aktuell_check[COL_NAECHSTER] < heute + timedelta(days=30))])
+    # --- DASHBOARD ---
+    heute = datetime.now().date()
+    # WICHTIG: Die nächste Zeile muss exakt unter 'heute' starten (4 Leerzeichen Einrückung)
+    df_aktuell_check = df_clean.sort_values(by=[COL_NAME, COL_LETZTER], ascending=[True, False]).drop_duplicates(subset=[COL_NAME])
+        
+    kritisch = len(df_aktuell_check[df_aktuell_check[COL_NAECHSTER] < heute])
+    bald = len(df_aktuell_check[(df_aktuell_check[COL_NAECHSTER] >= heute) & (df_aktuell_check[COL_NAECHSTER] < heute + timedelta(days=30))])
 
-        c1, c2, c3 = st.columns(3)
-        if kritisch > 0: c1.error(f"⚠️ {kritisch} überfällig!")
-        else: c1.success("✅ Alle Batterien OK")
-        if bald > 0: c2.warning(f"🔔 {bald} bald fällig")
-        c3.metric("Sender gesamt", len(df_aktuell_check))
+    c1, c2, c3 = st.columns(3)
+    if kritisch > 0:
+        c1.error(f"⚠️ {kritisch} Sender überfällig!")
+    else:
+        c1.success("✅ Alle Batterien OK")
+            
+    if bald > 0:
+        c2.warning(f"🔔 {bald} bald fällig")
+            
+    c3.metric("Sender gesamt", len(df_aktuell_check))
 
-        st.markdown("---")
+    st.markdown("---")
 
-        # --- EINGABE ---
+    # --- EINGABE ---
         with st.expander("➕ Neuen Batteriewechsel registrieren"):
             with st.form("entry_form", clear_on_submit=True):
                 col1, col2 = st.columns(2)
