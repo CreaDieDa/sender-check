@@ -42,35 +42,40 @@ def style_status(row, heute):
         return ['background-color: #d4edda; color: black'] * len(row)
 
 try:
-    # Daten laden (Korrigierter Funktionsaufruf)
+    # 1. Daten laden
     df_raw = load_data()
     
-    # --- NONE-KILLER ---
-    # Wir bereinigen erst mal nur die "None" Texte, behalten aber die Tabellenstruktur
+    # 2. "None" entfernen
     df = df_raw.fillna("").astype(str).replace(["None", "nan", "NaN", "<NA>"], "")
 
+    # Spaltennamen (sollten exakt so in Google stehen)
     COL_NAME = "Sender Name"
     COL_ORT = "Standort"
     COL_LETZTER = "Letzter Batteriewechsel"
     COL_NAECHSTER = "Nächster Wechsel (geplant)"
     COL_VERMERK = "Vermerke (z.B. Batterie)"
-    COL_STATUS = "Status"
 
-    if df.empty or COL_NAME not in df.columns:
-        st.warning("Die Tabelle scheint leer zu sein oder Spaltennamen fehlen.")
-    else:
-        # DATUMS-LOGIK (Zurück in echte Daten für Berechnungen)
-        df[COL_LETZTER] = pd.to_datetime(df[COL_LETZTER], errors='coerce').dt.date
-        df[COL_NAECHSTER] = pd.to_datetime(df[COL_NAECHSTER], errors='coerce').dt.date
-        
-        heute = datetime.now().date()
-        
-        # AUTOMATISCHE ERGÄNZUNG
-        maske = (df[COL_LETZTER].notnull()) & (df[COL_NAECHSTER].isnull())
-        df.loc[maske, COL_NAECHSTER] = df.loc[maske, COL_LETZTER] + timedelta(days=547)
+    # --- DATEN-SÄUBERUNG & SORTIERUNG (HIER EINFÜGEN) ---
+    # Datumstypen fixen (für Berechnungen wichtig)
+    df[COL_LETZTER] = pd.to_datetime(df[COL_LETZTER], errors='coerce').dt.date
+    df[COL_NAECHSTER] = pd.to_datetime(df[COL_NAECHSTER], errors='coerce').dt.date
+    
+    # NUR DIE AKTUELLSTEN EINTRÄGE BEHALTEN:
+    # Wir sortieren nach Name und Datum (neueste zuerst)
+    # drop_duplicates wirft dann die alten, erledigten Wechsel von 2021 raus
+    df_aktuell = df[df[COL_NAME] != ""].sort_values(by=[COL_NAME, COL_LETZTER], ascending=[True, False])
+    df_aktuell = df_aktuell.drop_duplicates(subset=[COL_NAME])
+    
+    # Für die Anzeige: Die kritischen (überfälligen) nach oben sortieren
+    df_view = df_aktuell.sort_values(by=[COL_NAECHSTER], ascending=True)
+    # ---------------------------------------------------
 
-        df_clean = df[df[COL_NAME] != ""].copy()
-
+    # --- DASHBOARD BERECHNUNG ---
+    heute = datetime.now().date()
+    # Wir rechnen nur mit der gefilterten Liste 'df_view'
+    kritisch = len(df_view[df_view[COL_NAECHSTER] < heute])
+    # ... Rest des Dashboards
+    
         # --- DASHBOARD ---
         df_aktuell_check = df_clean.sort_values(by=COL_LETZTER, ascending=False).drop_duplicates(subset=[COL_NAME])
         kritisch = len(df_aktuell_check[df_aktuell_check[COL_NAECHSTER] < heute])
