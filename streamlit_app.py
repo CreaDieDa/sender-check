@@ -13,7 +13,7 @@ st.markdown("""
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
-        .stDeployButton {display:none;}
+        .stDeployButton {display:   ;}
     </style>
     """, unsafe_allow_html=True)
 
