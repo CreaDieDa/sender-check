@@ -73,6 +73,12 @@ try:
     # Neueste zuerst (für die Auswahl des aktuellen Stands)
     df_aktuell = df_clean.sort_values(by=[COL_NAME, COL_LETZTER], ascending=[True, False])
     df_aktuell = df_aktuell.drop_duplicates(subset=[COL_NAME], keep='first')
+
+    # --- AUTOMATISCHER STATUS-TEXT ---
+    # Hier setzt das System den Status selbstständig auf OK oder ÜBERFÄLLIG
+    df_aktuell["Status"] = df_aktuell[COL_NAECHSTER].apply(
+        lambda x: "⚠️ ÜBERFÄLLIG" if x < heute else ("🔔 BALD FÄLLIG" if x < heute + timedelta(days=30) else "✅ OK")
+    )
     
     # Finaler View: Rot (Überfällig) nach oben
     df_view_final = df_aktuell.sort_values(by=[COL_NAECHSTER], ascending=True)
@@ -132,6 +138,11 @@ try:
         df_display = df_display[df_display[COL_ORT] == filter_ort]
 
     st.dataframe(
+        df_display.style.apply(style_status, axis=1, heute=heute).format({COL_LETZTER: format_date, COL_NAECHSTER: format_date}),
+        use_container_width=True, 
+        hide_index=True,
+        column_order=(COL_NAME, "Status", COL_ORT, COL_LETZTER, COL_NAECHSTER, COL_VERMERK)
+    )
         df_display.style.apply(style_status, axis=1, heute=heute).format({COL_LETZTER: format_date, COL_NAECHSTER: format_date}),
         use_container_width=True, hide_index=True
     )
