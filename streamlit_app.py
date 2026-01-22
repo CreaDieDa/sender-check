@@ -57,25 +57,22 @@ try:
     df[COL_LETZTER] = pd.to_datetime(df[COL_LETZTER], errors='coerce').dt.date
     df[COL_NAECHSTER] = pd.to_datetime(df[COL_NAECHSTER], errors='coerce').dt.date
     
-    # 3. AUTOMATISCHE ERGÄNZUNG (547 Tage)
+    # 3. AUTOMATISCHE ERGÄNZUNG (+547 Tage)
+    # Das füllt die "None" Felder aus deinem ersten Screenshot
     maske = (df[COL_LETZTER].notnull()) & (df[COL_NAECHSTER].isnull())
     df.loc[maske, COL_NAECHSTER] = df.loc[maske, COL_LETZTER] + timedelta(days=547)
 
-    # 4. SÄUBERUNG
-    df[COL_ORT] = df[COL_ORT].fillna("")
-    df[COL_VERMERK] = df[COL_VERMERK].fillna("")
-    
-    heute = datetime.now().date()
-
-    # 5. FILTERUNG: Nur der aktuellste Eintrag pro Sender
+    # 4. SÄUBERUNG & SORTIERUNG FÜR DIE AKTUELL-ANZEIGE
     df_clean = df[df[COL_NAME].notnull() & (df[COL_NAME] != "")].copy()
     
-    # Sortierung: Überfällig (altes Datum) nach oben
-    df_view_final = df_clean.sort_values(by=[COL_NAECHSTER, COL_NAME], ascending=[True, True])
-    df_view_final = df_view_final.drop_duplicates(subset=[COL_NAME], keep='first')
+    # WICHTIG: Erst nach Datum ABSTEIGEND sortieren (neueste Wechsel nach oben)
+    # Dann drop_duplicates: Behält nur die erste Zeile pro Sender (also die neueste!)
+    df_aktuell = df_clean.sort_values(by=[COL_NAME, COL_LETZTER], ascending=[True, False])
+    df_aktuell = df_aktuell.drop_duplicates(subset=[COL_NAME], keep='first')
     
-    # Brücke bauen, um den 'NameError' zu verhindern:
-    df_aktuell = df_view_final
+    # 5. FINALER VIEW FÜR DIE TABELLE (Rot/Überfällig nach oben)
+    # Jetzt sortieren wir die bereits gefilterten aktuellen Sender nach Dringlichkeit
+    df_view_final = df_aktuell.sort_values(by=[COL_NAECHSTER], ascending=True)
 
     # --- DASHBOARD ---
     kritisch = len(df_view_final[df_view_final[COL_NAECHSTER] < heute])
