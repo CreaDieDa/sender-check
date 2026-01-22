@@ -27,10 +27,6 @@ try:
 except Exception:
     st.warning("Verbindung wird aufgebaut... Bitte kurz warten.")
 
-@st.cache_data(ttl=600) # Speichert Daten für 10 Minuten für schnelles Laden am Handy
-def load_data():
-    return conn.read(spreadsheet=st.secrets.get("spreadsheet"), ttl=0)
-
 df = load_data()
 
 COL_NAME = "Sender Name"
