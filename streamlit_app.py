@@ -68,13 +68,27 @@ try:
     # 4. SÄUBERUNG & SORTIERUNG FÜR DIE AKTUELL-ANZEIGE
     df_clean = df[df[COL_NAME].notnull() & (df[COL_NAME] != "")].copy()
     
-    # Erst nach Datum ABSTEIGEND sortieren (neueste oben)
-    # Behält nur die erste Zeile pro Sender (also die neueste!)
+ # 3. AUTOMATISCHE ERGÄNZUNG (+547 Tage)
+    maske = (df[COL_LETZTER].notnull()) & (df[COL_NAECHSTER].isnull())
+    df.loc[maske, COL_NAECHSTER] = df.loc[maske, COL_LETZTER] + timedelta(days=547)
+
+    # --- REINIGUNG DER TEXT-SPALTEN (Gegen das 'None') ---
+    # Wir füllen leere Textzellen mit einem leeren String, 
+    # lassen aber die Datumsspalten (COL_LETZTER, COL_NAECHSTER) unberührt!
+    text_spalten = [COL_ORT, COL_VERMERK, "Status"]
+    for col in text_spalten:
+        if col in df.columns:
+            df[col] = df[col].fillna("").astype(str).replace(["None", "nan", "NaN", "<NA>"], "")
+
+    # 4. SÄUBERUNG & SORTIERUNG FÜR DIE AKTUELL-ANZEIGE
+    df_clean = df[df[COL_NAME].notnull() & (df[COL_NAME] != "")].copy()
+    
+    # Neueste zuerst, dann Duplikate weg
     df_aktuell = df_clean.sort_values(by=[COL_NAME, COL_LETZTER], ascending=[True, False])
     df_aktuell = df_aktuell.drop_duplicates(subset=[COL_NAME], keep='first')
     
-    # 5. FINALER VIEW FÜR DIE TABELLE (Überfällig nach oben)
-    df_view_final = df_aktuell.sort_values(by=[COL_NAECHSTER], ascending=True)
+    # Finaler View: Rot (Überfällig) nach oben
+    df_view_final = df_aktuell.sort_values(by=[COL_NAECHSTER], ascending=True)rue)
 
     # --- DASHBOARD BERECHNUNG ---
     kritisch = len(df_view_final[df_view_final[COL_NAECHSTER] < heute])
