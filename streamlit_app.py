@@ -75,7 +75,6 @@ try:
     df_aktuell = df_aktuell.drop_duplicates(subset=[COL_NAME], keep='first')
 
     # --- AUTOMATISCHER STATUS-TEXT ---
-    # Hier setzt das System den Status selbstständig auf OK oder ÜBERFÄLLIG
     df_aktuell["Status"] = df_aktuell[COL_NAECHSTER].apply(
         lambda x: "⚠️ ÜBERFÄLLIG" if x < heute else ("🔔 BALD FÄLLIG" if x < heute + timedelta(days=30) else "✅ OK")
     )
@@ -133,14 +132,19 @@ try:
     alle_standorte = sorted([s for s in df_aktuell[COL_ORT].unique() if s != ""])
     filter_ort = st.selectbox("Nach Standort filtern:", ["Alle Standorte"] + alle_standorte)
     
+    df_display = df_view_final.copy()
+    if filter_ort != "Alle Standorte":
+        df_display = df_display[df_display[COL_ORT] == filter_ort]
+
+    # Hier wird die Tabelle angezeigt
     st.dataframe(
-        df_display.style.apply(style_status, axis=1, heute=heute).format({COL_LETZTER: format_date, COL_NAECHSTER: format_date}),
+        df_display.style.apply(style_status, axis=1, heute=heute).format({
+            COL_LETZTER: format_date, 
+            COL_NAECHSTER: format_date
+        }),
         use_container_width=True, 
         hide_index=True,
         column_order=(COL_NAME, "Status", COL_ORT, COL_LETZTER, COL_NAECHSTER, COL_VERMERK)
-    )
-        df_display.style.apply(style_status, axis=1, heute=heute).format({COL_LETZTER: format_date, COL_NAECHSTER: format_date}),
-        use_container_width=True, hide_index=True
     )
 
     # --- HISTORIE ---
